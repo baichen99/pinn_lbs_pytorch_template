@@ -1,0 +1,6 @@
+__pycache__/
+.vscode/
+data/
+test_grad.py
+.DS_Store
+logs/*
