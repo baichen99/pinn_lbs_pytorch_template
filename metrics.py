@@ -1,10 +1,9 @@
 import numpy as np
 from sklearn.metrics import r2_score
-
-
-
+import torch
 
 def cal_l2_relative_error(pred, true):
+    assert pred.shape == true.shape
     err = np.linalg.norm(pred - true) / np.linalg.norm(true)
     return err
 
