@@ -24,7 +24,6 @@ The code for the self-adaptive loss balanced Pinn was taken from [this Github re
 │   ├── Sigma4.npy
 │   └── Sigma5.npy
 ├── losses.py
-├── main.py
 ├── metrics.py
 ├── net.py
 ├── pinn_lb.py
@@ -33,3 +32,15 @@ The code for the self-adaptive loss balanced Pinn was taken from [this Github re
 └── viz_history.py
 
 ```
+
+## Usage
+
+To use this template, you will need to have Python 3 and PyTorch installed on your system. Clone this repository and use it as a starting point to develop your own Pinn-based solver.
+
+In `losses.py`, the NS equation loss is implemented. You can refer to this code and add your own loss function.
+
+In `pinn_lb.py`, the training process for the self-adaptive loss balanced Pinn is implemented.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for more information.
