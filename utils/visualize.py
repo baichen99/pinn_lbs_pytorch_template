@@ -17,7 +17,8 @@ def print_loss_table(epoch, total_loss, mse_pde_1, mse_pde_2, mse_pde_3, mse_obs
     table.add_row("Obs 2 Loss", f"{mse_obs_2.item():.2e}")
     console.print(table)
 
-def print_epoch_err(epoch, err):
+def print_epoch_err(epoch, err, train=True):
     epoch_style = Style(color="cyan")
     err_style = Style(color="red")
-    console.print(f"[{epoch_style}]Epoch:[/] [{err_style}]{epoch}[/] [{epoch_style}] l2 relative err:[/] [{err_style}]{err}[/]")
+    prefix = 'train' if train else 'test'
+    console.print(f"[{epoch_style}]Epoch:[/] [{err_style}]{epoch}[/] [{epoch_style}] {prefix}: l2 relative err:[/] [{err_style}]{err}[/]")

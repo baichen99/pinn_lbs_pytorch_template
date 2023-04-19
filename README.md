@@ -13,16 +13,7 @@ The code for the self-adaptive loss balanced Pinn was taken from [this Github re
 │   ├── data.npy
 │   └── train_data.npy
 ├── logs
-│   ├── MSE_OBS_1.npy
-│   ├── MSE_OBS_2.npy
-│   ├── MSE_PDE_1.npy
-│   ├── MSE_PDE_2.npy
-│   ├── MSE_PDE_3.npy
-│   ├── Sigma1.npy
-│   ├── Sigma2.npy
-│   ├── Sigma3.npy
-│   ├── Sigma4.npy
-│   └── Sigma5.npy
+│   ├── history.npy
 ├── losses.py
 ├── metrics.py
 ├── net.py

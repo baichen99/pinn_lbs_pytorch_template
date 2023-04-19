@@ -1,7 +1,6 @@
 import torch
 from torch.autograd import grad 
 import numpy as np
-from torchviz import make_dot
 
 def gradients(u, x, allow_unused=True):
     """Compute u_x
