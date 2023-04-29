@@ -6,6 +6,7 @@ from metrics import cal_l2_relative_error
 from tqdm import tqdm
 
 from utils.sample import sample_pde_points
+from utils.visualize import print_loss_table, print_epoch_err
 
 
 
@@ -90,7 +91,7 @@ def train():
         Sigma3.append(sigma3.item())
         Sigma4.append(sigma4.item())
         Sigma5.append(sigma5.item())
-
+        
         
         loss = (
             mse_pde_1 / sigma1 ** 2 / 2 +  \
@@ -114,9 +115,8 @@ def train():
             v_true = test_data[:, 4:5].detach().numpy()
             l2_error_u = cal_l2_relative_error(u_pred, u_true)
             l2_error_v = cal_l2_relative_error(v_pred, v_true)
-            print('epoch: {}, loss: {:.4g}, mse_pde_1: {:.4g}, mse_pde_2: {:.4g}, mse_pde_3: {:.4g}, mse_obs_1: {:.4g}, mse_obs_2: {:.4g}, l2_error_u: {:.4g}, l2_error_v: {:.4g}'.format(
-                epoch, loss.item(), mse_pde_1.item(), mse_pde_2.item(), mse_pde_3.item(), mse_obs_1.item(), mse_obs_2.item(), l2_error_u, l2_error_v
-            ))
+            print_loss_table(epoch, mse_pde_1, mse_pde_2, mse_pde_3, mse_obs_1, mse_obs_2)
+            print_epoch_err(epoch, l2_error_u, l2_error_v)
     # save history to ./logs
 
 

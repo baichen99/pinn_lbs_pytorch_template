@@ -1,93 +1,52 @@
 import torch
 from net import Net
 import numpy as np
-from losses import ns_pde_loss, mse_loss
+from losses import pns_pde_loss, mse_loss
 from metrics import cal_l2_relative_error
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 from utils.dataset import get_dataloader
 from utils.sample import sample_pde_points
 from utils.visualize import print_loss_table, print_epoch_err
 
-class Config:
-    random_seed = 0
-    
-    lr = 1e-3
-    lr_decay = 0.95
-    lr_decay_epochs = 1000
-    epochs = 100000
-    eval_epochs = 1000
-    display_epochs = 1000
-    
-    optimizer_sigma = torch.optim.Adam
-    
-    obs_batch_size = 5000
-    pde_batch_size = 5000
-    train_data_path = 'data/train_data.npy'
-    test_data_path = 'data/data.npy'
-    additional_acnhors_path = ''
-    
-    # net
-    seq_net = [3] + [50]*5 + [4]
-    activation = torch.tanh
-    
-    # domain
-    x_min = 0.0
-    x_max = 0.2
-    y_min = 0.0
-    y_max = 0.26
-    t_min = 0
-    t_max = 10
-    
-    pde_points_num = 35000
-    
-    # store
-    history_path = 'logs/history.npy'
-    model_path = 'model.pth'
+from config import Config
     
 
 def train():
+    tb = SummaryWriter(Config.tensorbard_path)
     # set radom seed for reproduce
     torch.manual_seed(Config.random_seed)
     np.random.seed(Config.random_seed)
 
-    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-    # device = torch.device('cpu')
-    # cal how much memory will be use
-
+    # device = torch.device('cuda:1') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cpu')
     print('Using device:', device)
-    
+
+    # Define network, optimizer, scheduler
     net = Net(seq_net=Config.seq_net, activation=Config.activation).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=Config.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=Config.lr_decay_epochs, gamma=Config.lr_decay)
-    # observation data for train is a np array of (x, y, t, u, v, p)
-    obs_dataloader = get_dataloader(Config.train_data_path, Config.obs_batch_size, shuffle=True, device=device)
-    # test_dataloader = get_dataloader(Config.test_data_path, Config.obs_batch_size, shuffle=False, device=device)
+
+    # Define observation and test data loader
+    obs_dataloader = get_dataloader(Config.train_data_path, batch_size=Config.obs_batch_size, shuffle=True, device=device)
     test_data = torch.from_numpy(np.load(Config.test_data_path)).float().to(device)
 
-    # pde points loader
-    pde_points = sample_pde_points(Config.pde_points_num, Config.x_min, Config.x_max, Config.y_min, Config.y_max, Config.t_min, Config.t_max, distribution='normal')
-    pde_points = pde_points.to(device)
+    # Define PDE points and dataloader
+    pde_points = sample_pde_points(
+        Config.pde_points_num,
+        Config.x_min, Config.x_max,
+        Config.y_min, Config.y_max,
+        Config.t_min, Config.t_max,
+        distribution='normal').to(device)
     pde_dataloader = torch.utils.data.DataLoader(pde_points, batch_size=Config.pde_batch_size, shuffle=True)
 
-    # loss has 5 parts, 3 for pde, 2 for observation data
+    # Define loss scaling factors
     sigma1 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
     sigma2 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
-    sigma3 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
-    sigma4 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
-    sigma5 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
-    optimizer_sigma = Config.optimizer_sigma([sigma1, sigma2, sigma3, sigma4, sigma5], Config.lr)
-    
-    MSE_PDE_1 = []
-    MSE_PDE_2 = []
-    MSE_PDE_3 = []
-    MSE_OBS_1 = []
-    MSE_OBS_2 = []
-    Sigma1 = []
-    Sigma2 = []
-    Sigma3 = []
-    Sigma4 = []
-    Sigma5 = []
+
+    # Define optimizer for loss scaling factors
+    optimizer_sigma = Config.optimizer_sigma([sigma1, sigma2], Config.lr)
 
     for epoch in tqdm(range(Config.epochs), desc='Epoch'):
         optimizer.zero_grad()
@@ -100,8 +59,7 @@ def train():
             U_predict = net(batch[:, 0:3])
             mse_obs_1 = mse_loss(U_predict[:, 0:1], batch[:, 3:4])
             mse_obs_2 = mse_loss(U_predict[:, 1:2], batch[:, 4:5])
-            loss = (mse_obs_1 / sigma4 ** 2 / 2+  \
-                    mse_obs_2 / sigma5 ** 2 / 2)
+            loss = mse_obs_1 + mse_obs_2
             total_obs_loss.append(loss)
             
         for batch in pde_dataloader:
@@ -109,35 +67,22 @@ def train():
             pde_y = batch[:, 1:2].requires_grad_()
             pde_t = batch[:, 2:3].requires_grad_()
             pde_predict = net(torch.cat([pde_x, pde_y, pde_t], dim=1))
-            mse_pde_1, mse_pde_2, mse_pde_3 = ns_pde_loss(
+            mse_pde_1, mse_pde_2, mse_pde_3 = pns_pde_loss(
                 pde_x, pde_y, pde_t, 
                 pde_predict[:, 0:1], pde_predict[:, 1:2], pde_predict[:, 2:3], pde_predict[:, 3:4])
-            loss = (mse_pde_1 / sigma1 ** 2 / 2 +  \
-                    mse_pde_2 / sigma2 ** 2 / 2+  \
-                    mse_pde_3 / sigma3 ** 2 / 2)
+            loss = mse_pde_1 + mse_pde_2 + mse_pde_3
             total_pde_loss.append(loss)
-        
+        w_1 = 1 / (2 * sigma1.pow(2))
+        w_2 = 1 / (2 * sigma2.pow(2))
         # sum loss
-        total_loss = torch.stack(total_obs_loss).sum() + torch.stack(total_pde_loss).sum()
+        total_loss = (w_1 * torch.stack(total_obs_loss).mean() + w_2 * torch.stack(total_pde_loss).mean() + \
+            torch.log(sigma1) + torch.log(sigma2)) * 1e3
         total_loss.backward()
         
         optimizer.step()
         optimizer_sigma.step()
         scheduler.step()
-        
-        # print 5 loss item, use sci notation
-        if epoch % Config.display_epochs == 0:
-            # cal l2 err on train data
-            train_l2_err = []
-            for batch in obs_dataloader:
-                with torch.no_grad():
-                    U_predict = net(batch[:, 0:3])
-                u_err = cal_l2_relative_error(U_predict[:, 0:1].cpu(), batch[:, 3:4].cpu())
-                v_err = cal_l2_relative_error(U_predict[:, 1:2].cpu(), batch[:, 4:5].cpu())
-                train_l2_err.append([u_err, v_err])
-            train_l2_err = np.array(train_l2_err).mean(axis=0)
-            print_epoch_err(epoch, [train_l2_err[0], train_l2_err[1]])
-            print_loss_table(epoch, total_loss, mse_pde_1, mse_pde_2, mse_pde_3, mse_obs_1, mse_obs_2)
+              
         # append to list
         MSE_PDE_1.append(mse_pde_1.item())
         MSE_PDE_2.append(mse_pde_2.item())
@@ -149,6 +94,19 @@ def train():
         Sigma3.append(sigma3.item())
         Sigma4.append(sigma4.item())
         Sigma5.append(sigma5.item())
+        
+        # tensorboard
+        tb.add_scalar('loss/total_loss', torch.stack(total_obs_loss).sum() + torch.stack(total_pde_loss).sum(), epoch)
+        tb.add_scalar('loss/mse_pde_1', mse_pde_1, epoch)
+        tb.add_scalar('loss/mse_pde_2', mse_pde_2, epoch)
+        tb.add_scalar('loss/mse_pde_3', mse_pde_3, epoch)
+        tb.add_scalar('loss/mse_obs_1', mse_obs_1, epoch)
+        tb.add_scalar('loss/mse_obs_2', mse_obs_2, epoch)
+        tb.add_scalar('sigma/sigma1', sigma1, epoch)
+        tb.add_scalar('sigma/sigma2', sigma2, epoch)
+        tb.add_scalar('sigma/sigma3', sigma3, epoch)
+        tb.add_scalar('sigma/sigma4', sigma4, epoch)
+        tb.add_scalar('sigma/sigma5', sigma5, epoch)
         
         # eval
         if epoch % Config.eval_epochs == 0:
@@ -162,13 +120,18 @@ def train():
             l2_error_u = cal_l2_relative_error(u_pred, u_true)
             l2_error_v = cal_l2_relative_error(v_pred, v_true)
             print_epoch_err(epoch, [l2_error_u, l2_error_v], train=False)
-
-    
+            err_u1.append(l2_error_u)
+            err_u2.append(l2_error_v)
+            # tensorboard
+            tb.add_scalar('err/l2_error_u', l2_error_u, epoch)
+            tb.add_scalar('err/l2_error_v', l2_error_v, epoch)
     
     # save model
     torch.save(net.state_dict(), Config.model_path)
     # save loss
     np.save(Config.history_paths, np.array([MSE_PDE_1, MSE_PDE_2, MSE_PDE_3, MSE_OBS_1, MSE_OBS_2, Sigma1, Sigma2, Sigma3, Sigma4, Sigma5]))
+    # save error
+    np.save(Config.err_paths, np.stack([err_u1, err_u2], axis=1))
     
 if __name__ == '__main__':
     import time
