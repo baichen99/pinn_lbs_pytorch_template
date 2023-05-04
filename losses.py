@@ -71,8 +71,8 @@ def cylinder_ns_loss(x, y, t, u, v, p):
     loss_3 = mse_loss(eq_2)
     return [loss_1, loss_2, loss_3]
     
-# loss for cylinder_nektar_wake.py
-def cylinder_pns_loss(x, y, t, u, v, p, nu_t, rho_):
+# loss for cylinder_nektar_wake_pns.py
+def cylinder_pns_loss(x, y, t, u, v, p, rho_):
     
     rho = 1.0
     nu = 0.01
@@ -91,8 +91,8 @@ def cylinder_pns_loss(x, y, t, u, v, p, nu_t, rho_):
     v_yy = gradients(v_y, y)
 
     continuity = u_x + v_y
-    eq_1 = (u_t + (u*u_x + v * u_y) + p_x / (rho + rho_) - (nu + nu_t)  * (u_xx + u_yy))
-    eq_2 = (v_t + (u*v_x + v * v_y) + p_y / (rho + rho_) - (nu + nu_t)  * (v_xx + v_yy))
+    eq_1 = (u_t + (u*u_x + v * u_y) + p_x / (rho + rho_) - (nu)  * (u_xx + u_yy))
+    eq_2 = (v_t + (u*v_x + v * v_y) + p_y / (rho + rho_) - (nu)  * (v_xx + v_yy))
     # mse for pde loss
     loss_1 = mse_loss(continuity)
     loss_2 = mse_loss(eq_1)

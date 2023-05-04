@@ -17,7 +17,9 @@ t_min, t_max = 0.0, 7.0
 
 pde_points_num = 700
 
-seq_net = [3] + [50] * 6 + [5]
+# input: x y t
+# output: u v p T rho
+seq_net = [3] + [50] * 6 + [4]
 
 
 
@@ -95,7 +97,7 @@ def train():
             pde_predict = net(torch.cat((pde_x, pde_y, pde_t), 1))
             mse_pde_1, mse_pde_2, mse_pde_3 = cylinder_pns_loss(
                 pde_x, pde_y, pde_t,
-                pde_predict[:, 0:1], pde_predict[:, 1:2], pde_predict[:, 2:3], pde_predict[:, 3:4], pde_predict[:, 4:5]
+                pde_predict[:, 0:1], pde_predict[:, 1:2], pde_predict[:, 2:3], pde_predict[:, 3:4]
             )
             loss = mse_pde_1 + mse_pde_2 + mse_pde_3
             total_pde_loss.append(loss)

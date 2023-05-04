@@ -15,7 +15,7 @@ Lx_min, Lx_max = 1.0, 8.0
 Ly_min, Ly_max = -2.0, 2.0
 t_min, t_max = 0.0, 7.0
 
-pde_points_num = 700
+pde_points_num = 7000
 
 seq_net = [3] + [50] * 6 + [3]
 
@@ -77,17 +77,18 @@ def train():
     pde_points = torch.from_numpy(pde_points).float()
     obs_tensor = torch.from_numpy(np.hstack((ob_x, ob_y, ob_t, ob_u, ob_v, ob_p))).float()
     # Define loss scaling factors
-    sigma1 = torch.nn.Parameter(torch.tensor(1, dtype=torch.float32, requires_grad=True))
-    sigma2 = torch.nn.Parameter(torch.tensor(1, dtype=torch.float32, requires_grad=True))
-
+    log_sigma_1 = torch.tensor(-1.0, requires_grad=True)
+    log_sigma_2 = torch.tensor(-1.0, requires_grad=True)
+    log_sigma_3 = torch.tensor(-1.0, requires_grad=True)
+    log_sigma_4 = torch.tensor(-1.0, requires_grad=True)
+    log_sigma_5 = torch.tensor(-1.0, requires_grad=True)
+    
+    
     net = Net(seq_net, activation=torch.tanh)
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
-    optimizer_sigma = torch.optim.Adam([sigma1, sigma2], lr=1e-3)
+    optimizer = torch.optim.Adam(list(net.parameters()) + [log_sigma_1, log_sigma_2, log_sigma_3, log_sigma_4, log_sigma_5], lr=1e-3)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.1)
-    scheduler_sigma = torch.optim.lr_scheduler.StepLR(optimizer_sigma, step_size=10000, gamma=0.1)
     for epoch in range(20000):
         optimizer.zero_grad()
-        optimizer_sigma.zero_grad()
         # cal pde loss
         pde_x = pde_points[:, 0:1].requires_grad_()
         pde_y = pde_points[:, 1:2].requires_grad_()
@@ -103,20 +104,19 @@ def train():
         mse_obs_1 = torch.mean((obs_predict[:, 0:1] - obs_tensor[:, 3:4])**2)
         mse_obs_2 = torch.mean((obs_predict[:, 1:2] - obs_tensor[:, 4:5])**2)
 
-        # total loss
-        w_1 = 1 / (sigma1.pow(2) * 2)
-        w_2 = 1 / (sigma2.pow(2) * 2)
+        w_1 = 1 / torch.exp(log_sigma_1) ** 2 / 2
+        w_2 = 1 / torch.exp(log_sigma_2) ** 2 / 2
+        w_3 = 1 / torch.exp(log_sigma_3) ** 2 / 2
+        w_4 = 1 / torch.exp(log_sigma_4) ** 2 / 2
+        w_5 = 1 / torch.exp(log_sigma_5) ** 2 / 2
         # weighted_sum
         total_loss = (
-                w_1 * (mse_pde_1 +  mse_pde_2 + mse_pde_3) + torch.log(sigma1) + \
-                w_2 * (mse_obs_1 + mse_obs_2) + torch.log(sigma2)
+                (w_1 * mse_pde_1 +  w_2 * mse_pde_2 + w_3 * mse_pde_3) + (w_4 * mse_obs_1 + w_5 * mse_obs_2) + \
+                (log_sigma_1 + log_sigma_2 + log_sigma_3 + log_sigma_4 + log_sigma_5)
             )
         total_loss.backward()
-        
         optimizer.step()
-        optimizer_sigma.step()
         scheduler.step()
-        scheduler_sigma.step()
         
         tb.add_scalar('loss/mse_pde_1', mse_pde_1, epoch)
         tb.add_scalar('loss/mse_pde_2', mse_pde_2, epoch)
@@ -124,11 +124,17 @@ def train():
         tb.add_scalar('loss/mse_obs_1', mse_obs_1, epoch)
         tb.add_scalar('loss/mse_obs_2', mse_obs_2, epoch)
         tb.add_scalar('loss/total_loss', total_loss, epoch)
-        tb.add_scalar('sigma/sigma1', sigma1, epoch)
-        tb.add_scalar('sigma/sigma2', sigma2, epoch)
+        tb.add_scalar('log_sigma/log_sigma_1', log_sigma_1, epoch)
+        tb.add_scalar('log_sigma/log_sigma_2', log_sigma_2, epoch)
+        tb.add_scalar('log_sigma/log_sigma_3', log_sigma_3, epoch)
+        tb.add_scalar('log_sigma/log_sigma_4', log_sigma_4, epoch)
+        tb.add_scalar('log_sigma/log_sigma_5', log_sigma_5, epoch)
+        
         tb.add_scalar('weight/w1', w_1, epoch)
         tb.add_scalar('weight/w2', w_2, epoch)
-
+        tb.add_scalar('weight/w3', w_3, epoch)
+        tb.add_scalar('weight/w4', w_4, epoch)
+        tb.add_scalar('weight/w5', w_5, epoch)
 
     
         

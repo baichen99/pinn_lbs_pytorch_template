@@ -6,7 +6,6 @@ class Config:
     random_seed = 0
     
     # Optimizer settings
-    optimizer_sigma = torch.optim.Adam
     lr = 1e-3
     lr_decay = 0.5
     lr_decay_epochs = 1000
@@ -35,10 +34,9 @@ class Config:
     
     # Store settings
     history_path = 'logs/history.npy'
-    err_paths = ['logs/err.npy', 'logs/err_test.npy']
     tensorbard_path = 'tb_logs'
     model_path = 'model.pth'
     
     # Training settings
     epochs = 100000
-    eval_epochs = 100
+    eval_epochs = 1000

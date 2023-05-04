@@ -19,7 +19,7 @@ def train():
     torch.manual_seed(Config.random_seed)
     np.random.seed(Config.random_seed)
 
-    # device = torch.device('cuda:1') if torch.cuda.is_available() else torch.device('cpu')
+    # device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     device = torch.device('cpu')
     print('Using device:', device)
 
@@ -44,6 +44,8 @@ def train():
     # Define loss scaling factors
     sigma1 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
     sigma2 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
+    sigma3 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
+    sigma4 = torch.tensor(1, dtype=torch.float32, device=device, requires_grad=True)
 
     # Define optimizer for loss scaling factors
     optimizer_sigma = Config.optimizer_sigma([sigma1, sigma2], Config.lr)
@@ -83,17 +85,6 @@ def train():
         optimizer_sigma.step()
         scheduler.step()
               
-        # append to list
-        MSE_PDE_1.append(mse_pde_1.item())
-        MSE_PDE_2.append(mse_pde_2.item())
-        MSE_PDE_3.append(mse_pde_3.item())
-        MSE_OBS_1.append(mse_obs_1.item())
-        MSE_OBS_2.append(mse_obs_2.item())
-        Sigma1.append(sigma1.item())
-        Sigma2.append(sigma2.item())
-        Sigma3.append(sigma3.item())
-        Sigma4.append(sigma4.item())
-        Sigma5.append(sigma5.item())
         
         # tensorboard
         tb.add_scalar('loss/total_loss', torch.stack(total_obs_loss).sum() + torch.stack(total_pde_loss).sum(), epoch)
@@ -128,10 +119,6 @@ def train():
     
     # save model
     torch.save(net.state_dict(), Config.model_path)
-    # save loss
-    np.save(Config.history_paths, np.array([MSE_PDE_1, MSE_PDE_2, MSE_PDE_3, MSE_OBS_1, MSE_OBS_2, Sigma1, Sigma2, Sigma3, Sigma4, Sigma5]))
-    # save error
-    np.save(Config.err_paths, np.stack([err_u1, err_u2], axis=1))
     
 if __name__ == '__main__':
     import time

@@ -111,8 +111,8 @@ def train():
         total_loss = torch.mean(torch.stack(total_pde_loss)) + torch.mean(torch.stack(total_obs_loss))
         total_loss.backward()
         
-        lr_scheduler.step()
         optimizer.step()
+        lr_scheduler.step()
         
         tb.add_scalar('loss/total_loss', total_loss.item(), epoch)
         tb.add_scalar('loss/pde_loss', torch.mean(torch.stack(total_pde_loss)).item(), epoch)
